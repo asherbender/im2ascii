@@ -42,7 +42,7 @@ def scale_image(img, rescaled_width=80):
                                     clip=True)
 
 
-def average_pixels(img, char_width=1, char_height=2):
+def average_pixels(img, char_width=1, char_height=2, normalise=True):
 
     # Get size of image.
     height, width = img.shape
@@ -57,6 +57,11 @@ def average_pixels(img, char_width=1, char_height=2):
         for j in range(cols):
             mean_image[i, j] = img[(i*char_height):((i+1)*char_height),
                                    (j*char_width):((j+1)*char_width)].mean()
+
+    # Normalise image to be between 0 and 1.
+    if normalise:
+        mean_image -= mean_image.min()
+        mean_image /= mean_image.max()
 
     return mean_image, rows, cols
 
