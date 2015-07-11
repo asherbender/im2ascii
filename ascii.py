@@ -31,4 +31,25 @@ def average_pixels(img, char_width=1, char_height=2):
                                    (j*char_width):((j+1)*char_width)].mean()
 
     return mean_image, rows, cols
+
+
+def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY):
+
+    # Reshape image and intensity vector into arrays.
+    rows, cols = img.shape
+    pixels = img.flatten().reshape((1, img.size))
+    intensities = intensities.reshape((1, intensities.size))
+
+    # Bin pixels into nearest registered intensity.
+    idx = np.abs(intensities.T - pixels).argmin(axis=0).reshape((rows, cols))
+
+    # Convert intensity to ASCII characters.
+    ascii_art = ''
+    ascii_matrix = characters[idx].reshape((rows, cols))
+    for i in range(rows):
+        ascii_art += ''.join(unichr(c) for c in ascii_matrix[i, :]) + '\n'
+
+    return ascii_art
+
+
 if __name__=="__main__":
