@@ -67,7 +67,7 @@ def average_pixels(img, char_width=1, char_height=2, normalise=True):
 
 
 def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY,
-                       bins=None):
+                       bins=None, boarder=False):
 
     # Reshape image and intensity vector into arrays.
     rows, cols = img.shape
@@ -126,10 +126,22 @@ def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY,
         # Convert intensity to ASCII characters.
         ascii_matrix = characters[idx].reshape((rows, cols))
 
+    # Initialise ASCII art.
+    if boarder:
+        ascii_art = '+' + cols * '-' + '+\n'
+    else:
+        ascii_art = ''
+
     # Convert matrix to string.
-    ascii_art = ''
     for i in range(rows):
-        ascii_art += ''.join(unichr(c) for c in ascii_matrix[i, :]) + '\n'
+        row = ''.join(unichr(c) for c in ascii_matrix[i, :])
+        if boarder:
+            row = '|' + row + '|'
+
+        ascii_art += row + '\n'
+
+    if boarder:
+        ascii_art += '+' + cols * '-' + '+\n'
 
     return ascii_art
 
