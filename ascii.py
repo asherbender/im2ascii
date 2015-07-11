@@ -61,23 +61,63 @@ def average_pixels(img, char_width=1, char_height=2):
     return mean_image, rows, cols
 
 
-def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY):
+def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY,
+                       bins=None):
 
     # Reshape image and intensity vector into arrays.
     rows, cols = img.shape
     pixels = img.flatten().reshape((1, img.size))
     intensities = intensities.reshape((1, intensities.size))
 
-    # Bin pixels into nearest registered intensity.
-    idx = np.abs(intensities.T - pixels).argmin(axis=0).reshape((rows, cols))
+    # Bin pixel into intensity bin.
+    if bins:
+        counts, edges = np.histogram(intensities, bins=bins)
 
-    # Convert intensity to ASCII characters.
+        # Remove bins with zero observations.
+        t = [(count, edge) for count, edge in zip(counts, edges) if count > 0]
+        counts, edges = zip(*t)
+        edges = np.array(edges)
+
+        # Determine which bin the intensities belong to.
+        intensity_bin = np.digitize(intensities.flatten(), edges)
+
+        # Create list of choices for each bin.
+        choices = list()
+        for i in range(1, len(counts) + 1):
+            choices.append(characters[intensity_bin == i])
+
+        # Find closest bin.
+        edges = edges.reshape((1, len(edges)))
+        nearest_bin = np.abs(edges.T - pixels).argmin(axis=0)
+
+        # Iterate through bins.
+        ascii_matrix = np.zeros(nearest_bin.shape, dtype=np.int64)
+        for i in range(len(counts)):
+            idx = nearest_bin == i
+            if counts[i] == 1:
+                ascii_matrix[idx] = choices[i]
+            else:
+                ascii_matrix[idx] = np.random.choice(choices[i],
+                                                     size=idx.sum(),
+                                                     replace=True)
+
+        # Reshape matrix back to image dimensions.
+        ascii_matrix = ascii_matrix.reshape((rows, cols))
+
+    # Bin pixels into nearest registered intensity.
+    else:
+        idx = np.abs(intensities.T - pixels).argmin(axis=0).reshape((rows, cols))
+
+        # Convert intensity to ASCII characters.
+        ascii_matrix = characters[idx].reshape((rows, cols))
+
+    # Convert matrix to string.
     ascii_art = ''
-    ascii_matrix = characters[idx].reshape((rows, cols))
     for i in range(rows):
         ascii_art += ''.join(unichr(c) for c in ascii_matrix[i, :]) + '\n'
 
     return ascii_art
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
+    pass
