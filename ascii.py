@@ -76,9 +76,19 @@ def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY,
         # Remove bins with zero observations.
         t = [(count, edge) for count, edge in zip(counts, edges) if count > 0]
         counts, edges = zip(*t)
-        edges = np.array(edges)
+        counts = list(counts)
+        edges = list(edges)
+
+        # If the white space character exists and has been binned with other
+        # characters, make white space a category of its own.
+        sorted_intensities = np.sort(intensities.flatten())
+        if sorted_intensities[0] == 0 and counts[0] > 1:
+            counts.insert(0, 1)
+            counts[1] -= 1
+            edges.insert(1, 0.75 * sorted_intensities[1])
 
         # Determine which bin the intensities belong to.
+        edges = np.array(edges)
         intensity_bin = np.digitize(intensities.flatten(), edges)
 
         # Create list of choices for each bin.
