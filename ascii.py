@@ -6,6 +6,8 @@ import textwrap
 import numpy as np
 from skimage import io
 import skimage.transform
+from skimage.color import rgb2gray
+
 
 # Characters available for ASCII art.
 #
@@ -255,8 +257,19 @@ if __name__ == "__main__":
     character_width = 1
     character_height = args.ratio
 
-    # Load image (invert grey-scale. Zero is white, one is black).
-    img = 1. - io.imread(args.image, as_grey=True)
+    # Load image and convert to grey-scale.
+    #
+    # Note: the 'as_grey' option in io.imread does not appear to work on all
+    #       images.
+    #
+    img = io.imread(args.image)
+    if img.shape == (2,):
+        img = rgb2gray(img[0])
+    else:
+        img = rgb2gray(img)
+
+    # Invert grey-scale: zero is white, one is black.
+    img = 1. - img
 
     # Re-scale image width to number of characters specified. Preserve aspect
     # ratio.
