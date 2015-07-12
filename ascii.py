@@ -15,7 +15,7 @@ import skimage.transform
 #
 CHARS = np.array([126, ] + range(32, 62) + range(62, 94) + range(94, 126))
 
-# Hard-coded intensity for ASCII characters.
+# Hard-coded perceptual intensity for ASCII characters.
 CHAR_INTENSITY = np.array([0.286 , 0.    , 0.4   , 0.2372, 0.8726, 0.7619, 0.6703,
                            0.8285, 0.1182, 0.4071, 0.4082, 0.3452, 0.4034, 0.1594,
                            0.105 , 0.0943, 0.393 , 0.8866, 0.5729, 0.6595, 0.6895,
@@ -70,6 +70,40 @@ def average_pixels(img, char_width=1, char_height=2, normalise=True):
     return mean_image
 
 
+def bin_intensity(bins, characters, intensities):
+
+    # Bin character intensities into discrete levels.
+    counts, edges = np.histogram(intensities, bins=bins)
+
+    # Remove bins with zero observations.
+    t = [(count, edge) for count, edge in zip(counts, edges) if count > 0]
+    counts, edges = zip(*t)
+    counts = list(counts)
+    edges = list(edges)
+
+    # Make the lightest intensity a category of its own (so white backgrounds
+    # are not randomised).
+    sorted_intensities = np.sort(intensities)
+    if counts[0] > 1:
+        counts.insert(0, 1)
+        counts[1] -= 1
+        edges.insert(1, 0.75 * sorted_intensities[1])
+
+    # Determine which bin the intensities belong to.
+    #
+    # Note: bins without characters were removed. Approximate these values by
+    #       assigning pixels to the nearest bin that has characters.
+    edges = np.array(edges)
+    intensity_bin = np.digitize(intensities, edges)
+
+    # Create list of choices for each bin.
+    choices = list()
+    for i in range(1, len(counts) + 1):
+        choices.append(characters[intensity_bin == i])
+
+    return edges, choices
+
+
 def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY,
                        bins=None, boarder=False):
 
@@ -80,33 +114,7 @@ def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY,
 
     # Bin pixel into intensity bin.
     if bins:
-        counts, edges = np.histogram(intensities, bins=bins)
-
-        # Remove bins with zero observations.
-        t = [(count, edge) for count, edge in zip(counts, edges) if count > 0]
-        counts, edges = zip(*t)
-        counts = list(counts)
-        edges = list(edges)
-
-        # If the white space character exists and has been binned with other
-        # characters, make white space a category of its own.
-        sorted_intensities = np.sort(intensities.flatten())
-        if sorted_intensities[0] == 0 and counts[0] > 1:
-            counts.insert(0, 1)
-            counts[1] -= 1
-            edges.insert(1, 0.75 * sorted_intensities[1])
-
-        # Determine which bin the intensities belong to.
-        #
-        # Note: bins without characters were removed. Approximate these values
-        #       by assigning pixels to the nearest bin that has characters.
-        edges = np.array(edges)
-        intensity_bin = np.digitize(intensities.flatten(), edges)
-
-        # Create list of choices for each bin.
-        choices = list()
-        for i in range(1, len(counts) + 1):
-            choices.append(characters[intensity_bin == i])
+        edges, choices = bin_intensity(bins, characters, intensities.flatten())
 
         # Find closest bin.
         edges = edges.reshape((1, len(edges)))
@@ -114,9 +122,9 @@ def grayscale_to_ascii(img, characters=CHARS, intensities=CHAR_INTENSITY,
 
         # Iterate through bins.
         ascii_matrix = np.zeros(nearest_bin.shape, dtype=np.int64)
-        for i in range(len(counts)):
+        for i in range(len(choices)):
             idx = nearest_bin == i
-            if counts[i] == 1:
+            if len(choices[i]) == 1:
                 ascii_matrix[idx] = choices[i]
             else:
                 ascii_matrix[idx] = np.random.choice(choices[i],
@@ -193,7 +201,9 @@ if __name__ == "__main__":
                         help='Add boarder to ASCII art.')
 
     # Print character set.
-    msg = """Print character set with perceptual intensity and exit."""
+    msg = """Print character set with perceptual intensity and exit. If binning
+    has been enabled, each intensity level and its associated characters will
+    be printed."""
     parser.add_argument('--list', action='store_true', default=False, help=msg)
 
     # -------------------------------------------------------------------------
@@ -201,13 +211,24 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
     args = parser.parse_args()
 
-    print args
+    # Ensure the number of intensity bins is valid.
+    if (args.levels is not None) and ((args.levels < 5) or (args.levels > 50)):
+        raise Exception("'--bins' must be greater 5 and less than 50.")
 
     # Print characters and exit.
     if args.list:
-        sorted_set = sorted(zip(CHARS, CHAR_INTENSITY), key=lambda t: t[1])
-        for character, intensity in sorted_set:
-            print unichr(character), intensity
+        if args.levels:
+            char_set = zip(*bin_intensity(args.levels, CHARS, CHAR_INTENSITY))
+        else:
+            char_set = sorted(zip(CHAR_INTENSITY, CHARS), key=lambda t: t[0])
+
+        for intensity, character in char_set:
+            if isinstance(character, int):
+                string = unichr(character)
+            else:
+                string = ''.join([unichr(c) for c in character])
+            print '%1.4f: %s' % (intensity, string)
+
         sys.exit()
 
     # Ensure the image file exists.
@@ -223,10 +244,6 @@ if __name__ == "__main__":
     # Ensure the width is valid.
     if args.width < 2:
         raise Exception("'--width' must be greater than or equal to two.")
-
-    # Ensure the number of intensity bins is valid.
-    if (args.levels is not None) and ((args.levels < 5) or (args.levels > 50)):
-        raise Exception("'--bins' must be greater 5 and less than 50.")
 
     # Ensure the height:width ratio is valid.
     if args.ratio < 1:
