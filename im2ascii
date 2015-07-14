@@ -48,42 +48,21 @@ CHAR_INTENSITY = np.array([0.286 , 0.    , 0.4   , 0.2372, 0.8726, 0.7619, 0.670
                            0.5132, 0.5521, 0.4324, 0.5459])
 
 
-def scale_image(img, rescaled_width=80):
+def scale_image(img, rescaled_width=80, char_width=1., char_height=2.):
 
     # Get size of image.
     height, width = img.shape
 
     # Calculate height of re-scaled image in pixels (preserving aspect ratio).
-    rescaled_height = int(float(height * rescaled_width) / float(width))
+    rescaled_height = float(height * rescaled_width) / float(width)
+
+    # Account for non-square ASCII characters by adjusting the aspect ratio.
+    rescaled_height = int((char_width / char_height) * rescaled_height)
 
     # Re-scale image.
     return skimage.transform.resize(img,
                                     (rescaled_height, rescaled_width),
                                     clip=True)
-
-
-def average_pixels(img, char_width=1, char_height=2, normalise=True):
-
-    # Get size of image.
-    height, width = img.shape
-
-    # Calculate number of blocks, in rows and columns, to perform averaging.
-    rows = int(float(height) / float(char_height))
-    cols = int(float(width) / float(char_width))
-
-    # Average image in blocks.
-    mean_image = np.zeros((rows, cols))
-    for i in range(rows):
-        for j in range(cols):
-            mean_image[i, j] = img[(i*char_height):((i+1)*char_height),
-                                   (j*char_width):((j+1)*char_width)].mean()
-
-    # Normalise image to be between 0 and 1.
-    if normalise:
-        mean_image -= mean_image.min()
-        mean_image /= mean_image.max()
-
-    return mean_image
 
 
 def bin_intensity(bins, characters, intensities):
@@ -287,16 +266,12 @@ if __name__ == "__main__":
 
     # Re-scale image width to number of characters specified. Preserve aspect
     # ratio.
-    rescaled_img = scale_image(img, rescaled_width=args.width)
-
-    # Perform averaging on blocks in the re-scaled image. This takes into
-    # account the fact that ASCII character are rendered non-square.
-    mean_image = average_pixels(rescaled_img,
-                                char_width=character_width,
-                                char_height=character_height)
+    rescaled_img = scale_image(img, rescaled_width=args.width,
+                               char_width=float(character_width),
+                               char_height=float(character_height))
 
     # Convert mean intensity image into ASCII art.
-    ascii_art = grayscale_to_ascii(mean_image,
+    ascii_art = grayscale_to_ascii(rescaled_img,
                                    characters=CHARS,
                                    intensities=CHAR_INTENSITY,
                                    bins=args.levels,
